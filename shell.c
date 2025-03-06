@@ -71,6 +71,20 @@ void *excecuteCommand(char *cmd, char *buffer_of_last_command, bool isFirst) {
         buffer = strtok(NULL, " ");
     }
 
+    if(strcmp(args[0],"cd") == 0){
+        if(tot == 1){
+            chdir(getenv("HOME"));
+        }else{
+            if(chdir(args[1]) < 0)
+                fprintf(stderr, "cd failed\n");
+        }
+
+        for (int i = 0; i < tot; i++) {
+            free(args[i]);
+        }
+        return NULL;
+    } // handle cd command
+
     args[tot] = NULL;
     tot++;
 

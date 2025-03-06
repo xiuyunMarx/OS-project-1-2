@@ -3,7 +3,7 @@ CFLAGS = -Wall -Wextra -g
 TARGET = shell
 SRC = shell.c
 
-all: $(TARGET)
+all: clean $(TARGET)
 
 $(TARGET): $(SRC)
 	$(CC) $(CFLAGS) -o $(TARGET) $(SRC)
