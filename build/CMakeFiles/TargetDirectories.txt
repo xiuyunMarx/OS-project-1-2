@@ -1,3 +1,0 @@
-/home/xyma/MarxFiles/Homework/project1-2/build/CMakeFiles/shell.dir
-/home/xyma/MarxFiles/Homework/project1-2/build/CMakeFiles/edit_cache.dir
-/home/xyma/MarxFiles/Homework/project1-2/build/CMakeFiles/rebuild_cache.dir
