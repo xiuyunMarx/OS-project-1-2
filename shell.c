@@ -7,6 +7,7 @@
 #include "string.h"
 #include "sys/wait.h"
 #include "unistd.h"
+#define DEFAULT_BUFFER_SIZE 2048
 char command[1000];
 
 void removeTrailingLine() {
@@ -133,7 +134,7 @@ void *excecuteCommand(char *cmd, char *buffer_of_last_command, bool isFirst) {
         size_t bytesRead = 0;
         size_t totalBytesRead = 0;
         while (bytesRead = read(fd_out[0], buffer_of_last_command + totalBytesRead,
-                                sizeof(buffer_of_last_command - totalBytesRead - 1))) {
+                                DEFAULT_BUFFER_SIZE - totalBytesRead - 1 )) {
             totalBytesRead += bytesRead;
             // accumulate the reading end of pipe until the pipe gets empty
         }
@@ -172,8 +173,8 @@ int main() {
         int cmdCount = 0;
         parseCommand(cmd, &cmdCount);
 
-        char buffer_of_last_command[2048];
-        for (int i = 0; i < cmdCount; i++) {
+        char buffer_of_last_command[DEFAULT_BUFFER_SIZE]= "";
+        for (int i = 0; i < cmdCount;i++) {
             excecuteCommand(cmd[i], buffer_of_last_command, (i == 0));
             printf("%s\n", buffer_of_last_command);
         }
