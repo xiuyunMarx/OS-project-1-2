@@ -147,7 +147,7 @@ void *excecuteCommand(char *cmd, char *buffer_of_last_command, bool isFirst) {
 
         execvp(args[0], args);
 
-        perror("COMMAND EXECUTION failed");
+        perror("COMMAND EXECUTION failed ");
         exit(EXIT_FAILURE);
     } else if (pid > 0) {
         // parent process
@@ -214,6 +214,8 @@ void *shellCore(char command[], char ret[]) {
     return NULL;
 }
 
+static pthread_mutex_t glock = PTHREAD_MUTEX_INITIALIZER;
+
 void *serveClient(const int connfd, const struct sockaddr_in clientAddr){
     char recv_buffer[DEFAULT_BUFFER_SIZE];
     char send_buffer[DEFAULT_BUFFER_SIZE];
@@ -239,12 +241,15 @@ void *serveClient(const int connfd, const struct sockaddr_in clientAddr){
         
         printf("commmand from %d:%d :%s\n",clientAddr.sin_addr,clientAddr.sin_port,recv_buffer);
 
+        pthread_mutex_lock(&glock); //lock the mutex, here is the critical section
         chdir(working_dir);// change the working dir to the thread distinct working dir
         shellCore(recv_buffer,send_buffer);
         if(getcwd(working_dir, sizeof(working_dir)) == NULL){
             perror("getcwd failed");
             break;
         } // update the working dir
+        pthread_mutex_unlock(&glock);
+
 
         if (send(connfd, send_buffer, strlen(send_buffer), 0) < 0) {
             perror("send failed");
