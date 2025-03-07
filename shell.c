@@ -145,6 +145,9 @@ void *excecuteCommand(char *cmd, char *buffer_of_last_command, bool isFirst) {
         }
         close(fd_in[1]); //// Important: close the write end after writing so the child sees EOF.
 
+        buffer_of_last_command[0] = '\0'; 
+        //clear cache of last command
+
         size_t bytesRead = 0;
         size_t totalBytesRead = 0;
         while (bytesRead = read(fd_out[0], buffer_of_last_command + totalBytesRead,
@@ -171,7 +174,8 @@ void *excecuteCommand(char *cmd, char *buffer_of_last_command, bool isFirst) {
     return NULL;
 }
 
-int main() {
+int main(int argc, char *argv[]) {
+    
     while (true) {
         printf(">> ");
         if (fgets(command, sizeof(command), stdin) == NULL) {
