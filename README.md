@@ -10,6 +10,21 @@ To test the shell server:
    ```bash
    ./serverCore <ip_address> <port>
    ```
+
+> **Note** or run following command:
+   ```bash
+   ./shell <Port>
+   ```
+
 2. In a separate terminal, run a client-side service to connect to the server.
+
+   ```bash
+   telnet localhost <port>
+   ```
+> **Note** in this case , your server should be run on localhost,
+
+   ```bash
+   nc <ip_address> <port>
+   ```
 
 > **Note:** You may need to run `make` to compile the executables.
