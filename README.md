@@ -1,11 +1,15 @@
 # OS-project-1-2
 
-here is the OS-project-1-2, run the makefile to compile, the shell generated is the executable
+This repository contains the OS-project-1-2. Run the Makefile to compile the code. The executable for the shell is generated as `shell`.
 
-#shell server test
+## Shell Server Test
 
-to test the shell server, run serverCore with arguments like "./serverCore <ip addr> <port>"
+To test the shell server:
 
-and run a client side service in a separate terminal 
+1. Run `serverCore` with arguments:
+   ```bash
+   ./serverCore <ip_address> <port>
+   ```
+2. In a separate terminal, run a client-side service to connect to the server.
 
-**you may need to run "make" to compile the executables
+> **Note:** You may need to run `make` to compile the executables.
