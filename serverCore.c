@@ -10,12 +10,25 @@
 #include "string.h"
 #include "sys/wait.h"
 #include "unistd.h"
+#include "pthread.h"
+
 #define DEFAULT_BUFFER_SIZE 2048
+
+typedef struct{
+    int connfd;
+    struct sockaddr_in clientAddr;
+}clientInfo_t;
+
 
 void removeTrailingLine(char *command) {
     size_t len = strlen(command);
     if (len && command[len - 1] == '\n') {
         command[len - 1] = '\0';
+    }
+
+    char *cr = strchr(command, '\r');
+    if (cr) {
+        *cr = '\0'; 
     }
 }
 
@@ -77,8 +90,11 @@ void *excecuteCommand(char *cmd, char *buffer_of_last_command, bool isFirst) {
         if (tot == 1) {
             chdir(getenv("HOME"));
         } else {
-            if (chdir(args[1]) < 0)
+            if (chdir(args[1]) < 0){
                 fprintf(stderr, "cd failed\n");
+                strcat(buffer_of_last_command, "cd failed\n");
+            }
+                
         }
 
         for (int i = 0; i < tot; i++) {
@@ -176,7 +192,7 @@ void *excecuteCommand(char *cmd, char *buffer_of_last_command, bool isFirst) {
 }
 
 void *shellCore(char command[], char ret[]) {
-    printf(">> ");
+    // printf("message received from client: %s\n", command);
     if (strcmp(command, "exit\n") == 0) {
         strcpy(ret, "exit");
         return NULL;
@@ -198,6 +214,57 @@ void *shellCore(char command[], char ret[]) {
     return NULL;
 }
 
+void *serveClient(const int connfd, const struct sockaddr_in clientAddr){
+    char recv_buffer[DEFAULT_BUFFER_SIZE];
+    char send_buffer[DEFAULT_BUFFER_SIZE];
+
+    char working_dir[DEFAULT_BUFFER_SIZE];
+    strcpy(working_dir, getenv("HOME"));
+    while(true){
+        memset(recv_buffer, 0, sizeof(recv_buffer));
+        memset(send_buffer, 0, sizeof(send_buffer));
+
+        int byteRead = read(connfd, recv_buffer, sizeof(recv_buffer) - 1);
+        if(byteRead<0){
+            fprintf(stderr,"read from client side failed, client IP: %d:\n",clientAddr.sin_addr,clientAddr.sin_port);
+            close(connfd);
+            break;
+        } // handle exception
+
+        recv_buffer[byteRead] = '\0';  // null terminate the input
+
+        if(strcmp(recv_buffer,"exit\n")==0 || strcmp(recv_buffer,"exit")==0 ||  byteRead == 0){
+            break;
+        } // handle exit condition
+        
+        printf("commmand from %d:%d :%s\n",clientAddr.sin_addr,clientAddr.sin_port,recv_buffer);
+
+        chdir(working_dir);// change the working dir to the thread distinct working dir
+        shellCore(recv_buffer,send_buffer);
+        if(getcwd(working_dir, sizeof(working_dir)) == NULL){
+            perror("getcwd failed");
+            break;
+        } // update the working dir
+
+        if (send(connfd, send_buffer, strlen(send_buffer), 0) < 0) {
+            perror("send failed");
+            break;
+        }
+    }
+
+    printf("Connection from %s:%d closed\n", inet_ntoa(clientAddr.sin_addr), ntohs(clientAddr.sin_port));
+    close(connfd);
+
+    return NULL;
+}
+
+void *serveClientThread(void *arg){
+    clientInfo_t *clientInfo = (clientInfo_t *)arg;
+    serveClient(clientInfo->connfd,clientInfo->clientAddr);
+    free(clientInfo);
+    return NULL;
+}
+
 void *severCore(char ip_addr[], const int port) {
     int sockfd;
     sockfd = socket(AF_INET, SOCK_STREAM, 0);  // create a socket
@@ -213,7 +280,7 @@ void *severCore(char ip_addr[], const int port) {
         exit(EXIT_FAILURE);
     }
 
-    struct sockaddr_in serverAddr, clientAddr;
+    struct sockaddr_in serverAddr;
     memset(&serverAddr, 0, sizeof(serverAddr));
     serverAddr.sin_family = AF_INET;
     serverAddr.sin_addr.s_addr = inet_addr(ip_addr);  // initialize server's IP
@@ -235,46 +302,37 @@ void *severCore(char ip_addr[], const int port) {
 
     // Main server loop
     while (true) {
+        struct sockaddr_in clientAddr;
         socklen_t clientLen = sizeof(clientAddr);
         int connfd = accept(sockfd, (struct sockaddr *)&clientAddr, &clientLen);
+        //wait until client  connect
         if (connfd < 0) {
             perror("accept failed");
             continue;  // skip to next iteration instead of exiting
         }
         printf("Connection from %s:%d\n", inet_ntoa(clientAddr.sin_addr), ntohs(clientAddr.sin_port));
-
-        char recv_buffer[DEFAULT_BUFFER_SIZE];
-        char send_buffer[DEFAULT_BUFFER_SIZE];
-
-        // Loop for each connected client
-        while (true) {
-            memset(recv_buffer, 0, sizeof(recv_buffer));
-            memset(send_buffer, 0, sizeof(send_buffer));
-
-            int byteRead = read(connfd, recv_buffer, sizeof(recv_buffer) - 1);
-            if (byteRead < 0) {
-                perror("read failed");
-                close(connfd);
-                break;
-            }
-            // If client closed connection, break the inner loop.
-            if (byteRead == 0)
-                break;
-
-            recv_buffer[byteRead] = '\0';  // null terminate the input
-
-            shellCore(recv_buffer, send_buffer);  // process command, output stored in send_buffer
-
-            if (strcmp(send_buffer, "exit") == 0) {
-                break;
-            }
-            if (send(connfd, send_buffer, strlen(send_buffer), 0) < 0) {
-                perror("send failed");
-                break;
-            }
+        
+        clientInfo_t *INFO = malloc(sizeof(clientInfo_t));
+        if(INFO == NULL){
+            fprintf(stderr,"malloc failed\n");
+            close(connfd);
+            continue;
         }
-        printf("Connection from %s:%d closed\n", inet_ntoa(clientAddr.sin_addr), ntohs(clientAddr.sin_port));
-        close(connfd);
+
+        INFO->connfd = connfd;
+        INFO->clientAddr = clientAddr;
+
+        pthread_t clientThread;
+        pthread_attr_t attr;
+        pthread_attr_init(&attr);
+
+        int state = pthread_create(&clientThread, &attr, serveClientThread, (void *)INFO);
+        if(state != 0){
+            fprintf(stderr,"pthread_create failed\n");
+            close(connfd);
+            free(INFO);
+        }
+        pthread_detach(clientThread);
     }
 
     close(sockfd);
@@ -286,6 +344,9 @@ int main(int argc, char *argv[]) {
     if (argc == 3) {
         strcpy(ip_addr, argv[1]);
         port = atoi(argv[2]);
+    }else if(argc == 2){
+        strcpy(ip_addr,"127.0.0.1");
+        port = atoi(argv[1]);
     }
     severCore(ip_addr, port);
     return 0;
